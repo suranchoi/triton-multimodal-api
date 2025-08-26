@@ -26,7 +26,45 @@ triton-multimodal/
 ```
 
 
-## 💻 사용법
+## 💻 Setup
+
+### 0. 사전 준비
+
+#### Docker 환경에 FFmpeg 설치
+
+비디오 처리를 위해 Dockerfile을 수정하여 FFmpeg를 설치해야 합니다:
+
+```dockerfile
+FROM nvcr.io/nvidia/tritonserver:25.07-vllm-python-py3
+
+# FFmpeg 설치
+RUN apt-get update && apt-get install -y ffmpeg
+
+COPY . . 
+RUN pip install --no-cache-dir -r requirements.txt
+```
+
+#### 모델 경로 설정
+
+Triton 서버를 시작하기 전에 다음 파일들에서 모델 경로를 설정해야 합니다:
+
+1. **LLM 모델 설정** (`model_repository/llm/1/model.py`):
+```python
+# GEMMA3N_MODEL 환경 변수를 설정하거나 이 경로를 직접 수정하세요
+self.model_path = os.environ.get("GEMMA3N_MODEL", "/data2/huggingface/hub/gemma-3n-E4B-it")
+```
+
+2. **임베딩 모델 설정** (`model_repository/embedding/1/model.py`):
+```python
+# HF_HOME 환경 변수를 설정하거나 이 경로를 수정하세요
+HF_HOME = os.getenv("HF_HOME", "/data2/huggingface/")
+```
+
+다음 사항을 확인하세요:
+- 경로를 본인의 로컬 모델 경로로 변경
+- HuggingFace에서 모델이 다운로드되어 있는지 확인
+- 환경 변수를 사용하는 경우 적절히 설정
+- 모델 파일의 권한 확인
 
 ### 1. Triton 서버 시작
 
