@@ -1,0 +1,37 @@
+name: "embedding"
+backend: "python"
+
+max_batch_size: 0
+
+input [
+  {
+    name: "TEXT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]   # 가변 개수의 문장
+  },
+  {
+    name: "MODEL_NAME"
+    data_type: TYPE_STRING
+    dims: [ 1 ]    # "hf_id" 문자열 1개
+  }
+]
+
+output [
+  {
+    name: "EMBEDDINGS"
+    data_type: TYPE_FP32
+    dims: [ -1 ]  
+  },
+  {
+    name: "DIM"
+    data_type: TYPE_INT32
+    dims: [ 1 ]    # 임베딩 차원
+  }
+]
+
+instance_group [
+  {
+    kind: KIND_MODEL
+    count: 1
+  }
+]

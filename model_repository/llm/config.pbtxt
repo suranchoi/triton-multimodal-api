@@ -1,0 +1,61 @@
+name: "llm"
+backend: "python"
+
+input [
+  {
+    name: "input_text"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "image_data"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+    optional: true
+  },
+  {
+    name: "audio_data"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+    optional: true
+  },
+    {
+    name: "video_data"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+    optional: true
+  },
+  {
+    name: "max_length"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "temperature"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "top_p"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    optional: true
+  }
+]
+
+output [
+  {
+    name: "generated_text"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
