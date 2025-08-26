@@ -8,26 +8,26 @@ import triton_python_backend_utils as pb_utils
 from sentence_transformers import SentenceTransformer, models
 
 # =========================
-# 환경 변수
-# =========================s
+# Env
+# =========================
 HF_HOME = os.getenv("HF_HOME", "/data2/huggingface/")
 os.makedirs(HF_HOME, exist_ok=True)
 os.environ.setdefault("TRANSFORMERS_CACHE", HF_HOME)
 
-# 캐시 크기 (HF ID별 모델 캐시)
+# Cache size (model cache per HF ID)
 MAX_CACHED = int(os.getenv("ST_CACHE_SIZE", "4"))
 
-# 배치 크기
+# Batch size
 ST_BATCH = int(os.getenv("ST_BATCH", "64"))
 
-# FP16 사용 (CUDA에서만)
+# Use FP16 (CUDA only)
 ST_USE_FP16 = os.getenv("ST_USE_FP16", "0") == "1"
 
-# (옵션) 최대 시퀀스 길이 고정(0이면 모델 기본값 사용)
+# (Optional) Fixed maximum sequence length (0 to use model default)
 ST_MAX_SEQ = int(os.getenv("ST_MAX_SEQ", "0"))
 
 _lock = threading.Lock()
-_model_cache = OrderedDict()   # key: hf_id -> SentenceTransformer (mean pooling, normalize는 encode에서 적용)
+_model_cache = OrderedDict()   # key: hf_id -> SentenceTransformer (mean pooling, normalization applied in encode)
 
 
 def _device() -> str:
@@ -36,40 +36,40 @@ def _device() -> str:
 
 def _build_model(hf_id: str) -> SentenceTransformer:
     """
-    hf_id로 ST 모델을 로드하되,
-    - 백본(Transformer)만 재사용할 수 있도록 꺼내서
-    - mean Pooling으로 고정한 view를 구성
-    - (normalize는 encode() 옵션으로 처리)
+    Load ST model with hf_id and configure it:
+    - Extract backbone (Transformer) for reuse
+    - Create view with fixed mean pooling
+    - (Normalization handled via encode() option)
     """
     dev = _device()
 
-    # 1) 임시로 전체 ST를 로드
+    # 1) Temporarily load full ST
     try:
         st = SentenceTransformer(hf_id, device=dev, cache_folder=HF_HOME)
     except TypeError:
         st = SentenceTransformer(hf_id, device=dev, cache_dir=HF_HOME)
 
-    # 2) 내부 Transformer 모듈 찾기
+    # 2) Find internal Transformer module
     transf = None
     for m in st._modules.values():
         if isinstance(m, models.Transformer):
             transf = m
             break
     if transf is None:
-        # 안전장치: 보통 첫 모듈이 Transformer
+        # Fallback: Usually first module is Transformer
         if isinstance(st[0], models.Transformer):
             transf = st[0]
         else:
             raise RuntimeError("Failed to locate Transformer module in SentenceTransformer pipeline.")
 
-    # 3) FP16 (옵션)
+    # 3) FP16 (optional)
     if ST_USE_FP16 and torch.cuda.is_available():
         try:
             transf.auto_model.half()
         except Exception:
             pass  
 
-    # 4) mean pooling 고정
+    # 4) Configure mean pooling
     word_dim = transf.get_word_embedding_dimension()
     print(f"word_dim: {word_dim}")  
     pool = models.Pooling(
@@ -80,11 +80,11 @@ def _build_model(hf_id: str) -> SentenceTransformer:
     )
     print(f"pool: {pool}")  
 
-    # 5) mean pooling view 구성
+    # 5) Create mean pooling view
     st_view = SentenceTransformer(modules=[transf, pool], device=dev)
     print(f"st_view: {st_view}")  
 
-    # 6) max_seq_length (옵션)
+    # 6) Set max_seq_length (optional)
     if ST_MAX_SEQ and hasattr(st_view, "max_seq_length"):
         st_view.max_seq_length = int(ST_MAX_SEQ)
     print(f"st_view.max_seq_length: {st_view.max_seq_length}")  
@@ -120,7 +120,7 @@ class TritonPythonModel:
         responses = []
         for req in requests:
             try:
-                # 필수: TEXT [N], MODEL_NAME [1]
+                # Required: TEXT [N], MODEL_NAME [1]
                 text_tensor = pb_utils.get_input_tensor_by_name(req, "TEXT")
                 model_tensor = pb_utils.get_input_tensor_by_name(req, "MODEL_NAME")
                 if text_tensor is None or model_tensor is None:
@@ -131,13 +131,13 @@ class TritonPythonModel:
 
                 model = _get_model(hf_id)
 
-                # normalize는 항상 True로 고정
+                # Normalization always set to True
                 with torch.inference_mode():
                     emb = model.encode(
                         texts,
                         batch_size=ST_BATCH,
                         convert_to_numpy=True,
-                        normalize_embeddings=True,  # ★ 고정
+                        normalize_embeddings=True,  
                     )
                 print(f"emb: {emb}")    
                 dim = int(emb.shape[1])
